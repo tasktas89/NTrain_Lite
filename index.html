@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>App Fitness Pro</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            appbg: '#0F172A',     // Azul muy oscuro (Fondo)
+            appcard: '#1E293B',   // Azul oscuro (Tarjetas)
+            appblue: '#3B82F6',   // Azul principal (Botones, acentos)
+            appgreen: '#10B981',  // Verde éxito
+            appdanger: '#EF4444'  // Rojo peligro
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Ocultar flechas de inputs numéricos */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    /* Quitar parpadeo azul en móviles al tocar */
+    * { -webkit-tap-highlight-color: transparent; }
+    /* Ocultar barra de scroll estéticamente pero permitir scroll */
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+
+<body class="bg-appbg text-slate-100 font-sans antialiased overflow-x-hidden w-full h-screen flex flex-col" x-data="appData()">
+
+  <div x-show="currentTab === 1" class="flex-1 overflow-y-auto pb-28 w-full" x-transition.opacity>
+    <header class="px-5 pt-6 pb-4 flex justify-between items-start">
+      <div>
+        <h1 class="text-2xl font-bold text-white tracking-tight">Crear entrenamiento</h1>
+        <p class="text-slate-400 text-sm mt-1">Día 22 · Selecciona los ejercicios</p>
+      </div>
+    </header>
+
+    <div class="px-5 mb-4 flex gap-2">
+      <div class="flex-1 bg-appcard rounded-xl flex items-center px-4 h-12 border border-slate-700/50">
+        <span class="text-slate-400 mr-2">🔍</span>
+        <input type="text" x-model="searchQuery" placeholder="Buscar ejercicio..." 
+               class="bg-transparent text-white w-full outline-none placeholder-slate-500">
+      </div>
+      <button @click="showAddModal = true" 
+              class="bg-appcard text-appblue border border-appblue/30 px-4 rounded-xl font-medium flex items-center justify-center hover:bg-appblue/10 transition">
+        + Nuevo
+      </button>
+    </div>
+
+    <div x-show="selectedIds.length > 0" class="pl-5 mb-4 flex overflow-x-auto gap-2 pb-2 hide-scrollbar">
+      <template x-for="ex in getSelectedExercises()" :key="ex.id">
+        <div class="flex items-center gap-1 bg-appblue/15 border border-appblue/30 text-appblue px-3 py-1.5 rounded-full whitespace-nowrap text-sm font-medium">
+          <span x-text="ex.name.substring(0, 15) + (ex.name.length > 15 ? '...' : '')"></span>
+          <button @click="toggleSelect(ex.id)" class="ml-1 text-appblue/70 hover:text-appblue">✖</button>
+        </div>
+      </template>
+    </div>
+
+    <div class="px-5 pb-4">
+      <template x-for="ex in filteredExercises()" :key="ex.id">
+        <div @click="toggleSelect(ex.id)" class="flex items-center justify-between py-4 border-b border-slate-800 cursor-pointer group">
+          <div class="flex-1 pr-4">
+            <h3 class="text-base text-slate-100 font-medium group-hover:text-appblue transition" x-text="ex.name"></h3>
+            <p class="text-xs text-slate-500 mt-0.5" x-text="ex.group"></p>
+          </div>
+          <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors"
+               :class="selectedIds.includes(ex.id) ? 'bg-appgreen/20 border-appgreen text-appgreen' : 'border-slate-600 text-transparent'">
+            <span class="text-sm font-bold" x-show="selectedIds.includes(ex.id)">✓</span>
+            <span class="text-sm text-slate-500" x-show="!selectedIds.includes(ex.id)">+</span>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div x-show="selectedIds.length > 0" x-transition class="fixed bottom-20 left-0 right-0 px-5 z-10">
+      <button @click="currentTab = 2" class="w-full bg-appblue text-white font-bold text-lg py-4 rounded-2xl shadow-[0_4px_14px_0_rgba(59,130,246,0.39)] active:scale-95 transition-transform">
+        Entrenar (<span x-text="selectedIds.length"></span>)
+      </button>
+    </div>
+  </div>
+
+  <div x-show="currentTab === 2" style="display: none;" class="flex-1 overflow-y-auto pb-28 w-full" x-transition.opacity>
+    <header class="px-5 pt-6 pb-6 bg-appcard/30 border-b border-slate-800">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">Entrenamiento · Día 22</h2>
+      </div>
+      <div class="flex justify-between text-center max-w-sm mx-auto">
+        <div>
+          <p class="text-2xl font-bold text-white" x-text="selectedIds.length || 1"></p>
+          <p class="text-xs text-slate-500">Ejercicios</p>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-white" x-text="activeSets.filter(s => s.done).length"></p>
+          <p class="text-xs text-slate-500">Series OK</p>
+        </div>
+        <div>
+          <p class="text-2xl font-bold text-white">2170<span class="text-sm text-slate-400 font-normal">kg</span></p>
+          <p class="text-xs text-slate-500">Volumen</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="px-5 pt-6">
+      <div class="flex justify-between items-end mb-4">
+        <h3 class="text-lg font-bold text-appblue">Chest Press inclinado con barra</h3>
+        <button class="text-slate-400 font-bold text-xl">⋮</button>
+      </div>
+      <p class="text-xs text-slate-500 mb-6">Última vez: <span class="bg-slate-800 px-2 py-1 rounded text-slate-300">3 x 10 @ 60kg</span></p>
+
+      <div class="space-y-3">
+        <template x-for="(set, index) in activeSets" :key="index">
+          <div class="relative">
+            <div @click="focusedRow = index" class="flex items-center justify-between rounded-xl p-3 transition-colors border"
+                 :class="focusedRow === index ? 'bg-appcard border-slate-600' : (set.done ? 'opacity-50 border-transparent' : 'border-transparent')">
+              
+              <span class="text-slate-500 text-sm font-bold w-6" x-text="index + 1"></span>
+              
+              <div class="flex-1 flex justify-center items-center gap-2">
+                <input type="number" x-model="set.peso" placeholder="--" class="w-14 bg-transparent text-center text-xl font-bold text-white outline-none border-b-2 border-slate-700 focus:border-appblue pb-1">
+                <span class="text-slate-500 text-sm">kg</span>
+                <span class="text-slate-600 mx-1">×</span>
+                <input type="number" x-model="set.reps" placeholder="--" class="w-12 bg-transparent text-center text-xl font-bold text-white outline-none border-b-2 border-slate-700 focus:border-appblue pb-1">
+                <span class="text-slate-500 text-sm">reps</span>
+              </div>
+
+              <button @click.stop="toggleSetDone(index)" class="w-10 h-10 rounded-full flex items-center justify-center transition-all ml-2"
+                      :class="set.done ? 'bg-appgreen text-appbg' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'">
+                <span class="text-lg font-bold" x-show="set.done">✓</span>
+              </button>
+            </div>
+
+            <div x-show="focusedRow === index" x-transition.duration.200ms class="flex justify-center gap-2 mt-2 mb-3">
+              <button @click="addWeight(index, 2.5)" class="bg-slate-800 text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-slate-700">+2.5 kg</button>
+              <button @click="addWeight(index, 5)" class="bg-slate-800 text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-slate-700">+5 kg</button>
+              <button @click="addReps(index, 1)" class="bg-slate-800 text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-slate-700">+1 rep</button>
+            </div>
+          </div>
+        </template>
+
+        <button @click="addSet()" class="w-full py-3 text-slate-400 border border-dashed border-slate-700 rounded-xl text-sm font-medium hover:text-white hover:border-slate-500 transition mt-2">
+          + Añadir Serie
+        </button>
+      </div>
+
+      <button class="w-full bg-slate-800 text-white font-bold py-4 rounded-2xl mt-8">
+        Guardar y Finalizar
+      </button>
+    </div>
+  </div>
+
+  <div x-show="currentTab === 3" style="display: none;" class="flex-1 overflow-y-auto pb-28 w-full" x-transition.opacity>
+    <header class="px-5 pt-6 pb-6 bg-appcard/30 border-b border-slate-800">
+      <h1 class="text-2xl font-bold text-white mb-6">Historial</h1>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-appbg rounded-xl p-4 border border-slate-800">
+          <p class="text-xs text-slate-400 mb-1">Total Sesiones</p>
+          <p class="text-2xl font-bold text-white">24</p>
+        </div>
+        <div class="bg-appbg rounded-xl p-4 border border-slate-800">
+          <p class="text-xs text-slate-400 mb-1">Volumen Total</p>
+          <p class="text-2xl font-bold text-appblue">27.5<span class="text-sm font-normal text-slate-400"> tn</span></p>
+        </div>
+      </div>
+    </header>
+
+    <div class="px-5 pt-6 space-y-8">
+      <template x-for="day in historyData" :key="day.date">
+        <div class="relative pl-4 border-l-2 border-slate-800">
+          <div class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-appbg border-4 border-appblue"></div>
+          
+          <div class="mb-4">
+            <h3 class="text-lg font-bold text-white" x-text="day.date"></h3>
+            <p class="text-xs text-slate-400 mt-1"><span x-text="day.exercisesCount"></span> ejercicios · <span x-text="day.volume"></span> kg volumen</p>
+          </div>
+
+          <div class="space-y-4">
+            <template x-for="ex in day.exercises" :key="ex.name">
+              <div class="bg-appcard rounded-xl p-4">
+                <h4 class="text-sm font-bold text-white mb-3" x-text="ex.name"></h4>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="setInfo in ex.setsSummary">
+                    <span class="text-xs font-medium px-2.5 py-1.5 rounded-md"
+                          :class="setInfo.includes('Drop') ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 'bg-slate-800 text-slate-300 border border-slate-700'"
+                          x-text="setInfo">
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <div x-show="currentTab === 4" style="display: none;" class="flex-1 overflow-y-auto pb-28 w-full" x-transition.opacity>
+    <header class="px-5 pt-6 pb-4">
+      <h1 class="text-2xl font-bold text-white">Ajustes</h1>
+    </header>
+
+    <div class="px-5 space-y-8 pb-10">
+      
+      <div>
+        <p class="text-xs font-bold text-slate-500 tracking-wider mb-3 px-1">PREFERENCIAS</p>
+        <div class="bg-appcard rounded-2xl overflow-hidden divide-y divide-slate-800 border border-slate-800">
+          <div class="flex items-center justify-between p-4">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">⚖️</span>
+              <span class="text-sm font-medium text-white">Unidades de peso</span>
+            </div>
+            <select class="bg-transparent text-appblue text-sm font-bold outline-none appearance-none text-right">
+              <option value="kg">Kilogramos (kg)</option>
+              <option value="lbs">Libras (lbs)</option>
+            </select>
+          </div>
+          <div class="flex items-center justify-between p-4">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">⏱️</span>
+              <span class="text-sm font-medium text-white">Temporizador automático</span>
+            </div>
+            <div class="w-11 h-6 bg-appblue rounded-full relative cursor-pointer">
+              <div class="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="text-xs font-bold text-slate-500 tracking-wider mb-3 px-1">DATOS Y COPIAS</p>
+        <div class="bg-appcard rounded-2xl overflow-hidden divide-y divide-slate-800 border border-slate-800">
+          <button class="w-full flex items-center justify-between p-4 hover:bg-slate-800 transition text-left">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">📊</span>
+              <span class="text-sm font-medium text-white">Exportar a Excel (CSV)</span>
+            </div>
+            <span class="text-slate-500">›</span>
+          </button>
+          <button class="w-full flex items-center justify-between p-4 hover:bg-slate-800 transition text-left">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">📦</span>
+              <span class="text-sm font-medium text-white">Exportar Backup (JSON)</span>
+            </div>
+            <span class="text-slate-500">›</span>
+          </button>
+          <label class="w-full flex items-center justify-between p-4 hover:bg-slate-800 transition text-left cursor-pointer">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">📂</span>
+              <span class="text-sm font-medium text-white">Importar Backup</span>
+            </div>
+            <span class="text-slate-500">›</span>
+            <input type="file" class="hidden" accept=".json">
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <p class="text-xs font-bold text-appdanger tracking-wider mb-3 px-1">ZONA DE PELIGRO</p>
+        <button class="w-full bg-appcard border border-appdanger/30 rounded-2xl flex items-center justify-center p-4 hover:bg-appdanger/10 transition">
+          <span class="text-appdanger font-bold text-sm">Borrar todos los datos</span>
+        </button>
+      </div>
+      
+      <p class="text-center text-xs text-slate-600 mt-8">App Fitness Pro v1.0</p>
+    </div>
+  </div>
+
+  <div x-show="showAddModal" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center px-5">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="showAddModal = false" x-show="showAddModal" x-transition.opacity></div>
+    
+    <div class="bg-appcard w-full max-w-sm rounded-2xl p-6 relative z-10 border border-slate-700 shadow-2xl" 
+         x-show="showAddModal" x-transition.scale.origin.bottom>
+      <h3 class="text-xl font-bold text-white mb-4">Nuevo Ejercicio</h3>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Nombre del ejercicio</label>
+          <input type="text" x-model="newEx.name" placeholder="Ej: Curl de bíceps..." 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-appblue">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Grupo Muscular</label>
+          <select x-model="newEx.group" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-appblue">
+            <option value="Pecho">Pecho</option>
+            <option value="Espalda">Espalda</option>
+            <option value="Piernas">Piernas</option>
+            <option value="Hombros">Hombros</option>
+            <option value="Brazos">Brazos</option>
+            <option value="Core">Core</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-8">
+        <button @click="showAddModal = false" class="flex-1 py-3 rounded-xl text-slate-400 font-medium">Cancelar</button>
+        <button @click="saveNewExercise()" class="flex-1 bg-appblue py-3 rounded-xl text-white font-bold">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="fixed bottom-0 w-full bg-appbg/95 backdrop-blur-md border-t border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40">
+    <button @click="currentTab = 1" class="flex flex-col items-center p-2" :class="currentTab === 1 ? 'text-appblue' : 'text-slate-500 hover:text-slate-300'">
+      <span class="text-xl mb-1">📝</span>
+      <span class="text-[10px] font-medium">Crear</span>
+    </button>
+    <button @click="currentTab = 2" class="flex flex-col items-center p-2" :class="currentTab === 2 ? 'text-appblue' : 'text-slate-500 hover:text-slate-300'">
+      <span class="text-xl mb-1">🏋️</span>
+      <span class="text-[10px] font-medium">Entrenar</span>
+    </button>
+    <button @click="currentTab = 3" class="flex flex-col items-center p-2" :class="currentTab === 3 ? 'text-appblue' : 'text-slate-500 hover:text-slate-300'">
+      <span class="text-xl mb-1">📊</span>
+      <span class="text-[10px] font-medium">Historial</span>
+    </button>
+    <button @click="currentTab = 4" class="flex flex-col items-center p-2" :class="currentTab === 4 ? 'text-appblue' : 'text-slate-500 hover:text-slate-300'">
+      <span class="text-xl mb-1">⚙️</span>
+      <span class="text-[10px] font-medium">Ajustes</span>
+    </button>
+  </nav>
+
+  <script>
+    function appData() {
+      return {
+        currentTab: 1, // 1:Crear, 2:Entrenar, 3:Resumen, 4:Ajustes
+        
+        // --- Estado Pantalla 1 ---
+        searchQuery: '',
+        showAddModal: false,
+        newEx: { name: '', group: 'Pecho' },
+        selectedIds: [],
+        exercises: [
+          { id: '1', name: 'Chest Press inclinado con barra', group: 'Pecho' },
+          { id: '2', name: 'Chest Press inclinado mancuernas', group: 'Pecho' },
+          { id: '3', name: 'Sentadilla Libre', group: 'Piernas' },
+          { id: '4', name: 'Dominadas', group: 'Espalda' },
+        ],
+
+        // --- Estado Pantalla 2 ---
+        focusedRow: 0,
+        activeSets: [
+          { peso: '60', reps: '10', done: false },
+          { peso: '60', reps: '10', done: false },
+          { peso: '', reps: '', done: false }
+        ],
+
+        // --- Estado Pantalla 3 (Datos de prueba para el muro) ---
+        historyData: [
+          {
+            date: 'Hoy · Día 22',
+            exercisesCount: 3,
+            volume: '3450.0',
+            exercises: [
+              { name: 'Chest Press inclinado con barra', setsSummary: ['3 x 10 @ 60kg'] },
+              { name: 'Aperturas en Polea', setsSummary: ['2 x 12 @ 15kg', '1 x 10 @ 10kg (Drop)'] }
+            ]
+          },
+          {
+            date: 'Ayer · Día 21',
+            exercisesCount: 2,
+            volume: '2170.5',
+            exercises: [
+              { name: 'Sentadilla Libre', setsSummary: ['4 x 8 @ 100kg'] },
+              { name: 'Prensa', setsSummary: ['3 x 12 @ 120kg'] }
+            ]
+          }
+        ],
+
+        // --- Métodos ---
+        filteredExercises() {
+          if (this.searchQuery === '') return this.exercises;
+          return this.exercises.filter(ex => 
+            ex.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            ex.group.toLowerCase().includes(this.searchQuery.toLowerCase())
+          );
+        },
+        toggleSelect(id) {
+          if (this.selectedIds.includes(id)) {
+            this.selectedIds = this.selectedIds.filter(i => i !== id);
+          } else {
+            this.selectedIds.push(id);
+          }
+        },
+        getSelectedExercises() {
+          return this.selectedIds.map(id => this.exercises.find(e => e.id === id));
+        },
+        saveNewExercise() {
+          if (this.newEx.name.trim() === '') return;
+          const newId = Date.now().toString();
+          this.exercises.unshift({ id: newId, name: this.newEx.name, group: this.newEx.group });
+          this.toggleSelect(newId);
+          this.newEx.name = ''; 
+          this.showAddModal = false;
+        },
+        toggleSetDone(index) {
+          this.activeSets[index].done = !this.activeSets[index].done;
+          if (this.activeSets[index].done && index < this.activeSets.length - 1) {
+            this.focusedRow = index + 1;
+          }
+        },
+        addSet() {
+          this.activeSets.push({ peso: '', reps: '', done: false });
+          this.focusedRow = this.activeSets.length - 1;
+        },
+        addWeight(index, amount) {
+          let current = parseFloat(this.activeSets[index].peso) || 0;
+          this.activeSets[index].peso = (current + amount).toString();
+        },
+        addReps(index, amount) {
+          let current = parseInt(this.activeSets[index].reps) || 0;
+          this.activeSets[index].reps = (current + amount).toString();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
