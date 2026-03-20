@@ -1,7 +1,6 @@
 const CACHE_NAME = 'pwa-cache-v1774033421166';
 const urlsToCache = [
   "./",
-  "./Generador-pwa.js",
   "./icon.png",
   "./index.html"
 ];
