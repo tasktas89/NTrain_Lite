@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pwa-cache-v1774007665232';
+const CACHE_NAME = 'pwa-cache-v1774033421166';
 const urlsToCache = [
   "./",
   "./Generador-pwa.js",
